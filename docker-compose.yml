@@ -1,0 +1,96 @@
+version: "3.8"
+
+services:
+  # Billing API
+  billing-api:
+    build: .
+    container_name: kanizsa-billing-api
+    ports:
+      - "8000:8000"
+    environment:
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID}
+      - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+  # Payment Processor
+  payment-processor:
+    build: .
+    container_name: kanizsa-payment-processor
+    environment:
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID}
+      - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET}
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+  # Subscription Manager
+  subscription-manager:
+    build: .
+    container_name: kanizsa-subscription-manager
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+  # Invoice Generator
+  invoice-generator:
+    build: .
+    container_name: kanizsa-invoice-generator
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./config:/app/config
+      - ./config/templates:/app/templates
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+  # Financial Analytics
+  financial-analytics:
+    build: .
+    container_name: kanizsa-financial-analytics
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: kanizsa-billing-db
+    environment:
+      - POSTGRES_DB=kanizsa_billing
+      - POSTGRES_USER=billing_user
+      - POSTGRES_PASSWORD=billing_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - kanizsa-billing
+
+volumes:
+  postgres_data:
+
+networks:
+  kanizsa-billing:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
